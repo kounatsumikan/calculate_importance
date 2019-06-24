@@ -2,26 +2,15 @@ import pandas as pd
 from minepy import MINE
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.ensemble import ExtraTreesRegressor
+from sklearn import preprocessing
+import numpy as np
+import datetime
+from utils.utils import now
 
 
 class calculate_importance():
-    
-    def __new__(self):
-        '''
-        イニシャライザ
-        
-        all_rf_importance (pandas.DataFrame): ランダムフォレストの重要度を格納するdataframe
-        all_etr_importance (pandas.DataFrame): extratreesregressorの重要度を格納するdataframe
-        all_rf_importance (pandas.DataFrame): ランダムフォレストの重要度を格納するdataframe
-        all_rf_importance (pandas.DataFrame): ランダムフォレストの重要度を格納するdataframe
-        '''
-        self.all_rf_importance = pd.DataFrame()
-        self.all_etr_importance = pd.DataFrame()
-        self.all_mic = pd.DataFrame()
-        self.all_corr = pd.DataFrame()
-    
-    
-    def __init__(self, variables, purpose):
+
+    def __init__(self, variables, purpose, ):
         '''
         目的変数に対する重要度や相関係数を算出するクラス
 
@@ -29,6 +18,10 @@ class calculate_importance():
             variables (pandas.DataFrame): 説明変数を格納したdataframe
             purpose (pandas.DataFrame): 目的変数を格納したdataframe
         '''
+        self._all_rf_importance = pd.DataFrame()
+        self._all_etr_importance = pd.DataFrame()
+        self._all_mic = pd.DataFrame()
+        self._all_corr = pd.DataFrame()
         # 特徴量と目的変数に分ける
         X = variables.copy()
         y = purpose.copy()
@@ -52,11 +45,11 @@ class calculate_importance():
             mic = pd.Series(mic_list, index=feature_x, name=column)
             corr = pd.Series(corr_list, index=feature_x, name=column)
 
-            self.all_corr = pd.concat([self.all_corr, corr], axis=1, sort=False)
-            self.all_mic = pd.concat([self.all_mic, mic], axis=1, sort=False)
-            self.all_rf_importance = pd.concat([self.all_rf_importance, rf_importance], axis=1, sort=False)
-            self.all_etr_importance = pd.concat([self.all_etr_importance, etr_importance], axis=1, sort=False)
-        self.all_corr = self.all_corr.fillna(0)
+            self._all_corr = pd.concat([self._all_corr, corr], axis=1, sort=False)
+            self._all_mic = pd.concat([self._all_mic, mic], axis=1, sort=False)
+            self._all_rf_importance = pd.concat([self._all_rf_importance, rf_importance], axis=1, sort=False)
+            self._all_etr_importance = pd.concat([self._all_etr_importance, etr_importance], axis=1, sort=False)
+        self._all_corr = self._all_corr.fillna(0)
 
 
     def __calculate_rf_importance(self, X, y):
@@ -118,6 +111,18 @@ class calculate_importance():
         return corr_list
 
 
+    def __rank_importance(self, df, column):
+        df = df.sort_values(column, ascending=False)
+        df["rank"] = range(1, len(df)+1)
+        df["rank"] = df["rank"]/len(df)
+        df["rank"] = df["rank"].where(df["rank"] > 0.1, 5)
+        df["rank"] = df["rank"].where(df["rank"] > 0.2, 4)
+        df["rank"] = df["rank"].where(df["rank"] > 0.3, 3)
+        df["rank"] = df["rank"].where(df["rank"] > 0.4, 2)
+        df["rank"] = df["rank"].where(df["rank"] > 2, 1)
+        return df["rank"]
+
+
     def rank_feature(self, output_name):
         '''
         総関係数や重要度から算出したスコアで説明変数に順位をつける
@@ -125,27 +130,31 @@ class calculate_importance():
         Args:
             output_name (String): 保存するエクセルのファイル名
         '''
-        corr = self.all_corr
-        mic = self.all_mic
-        rf = self.all_rf_importance
-        etr = self.all_etr_importance
-        writer = pd.ExcelWriter(f"../output/{datetime.datetime.today().strftime('%Y%m%d%H')}_{output_name}")
+        corr = self._all_corr
+        mic = self._all_mic
+        rf = self._all_rf_importance
+        etr = self._all_etr_importance
+        rank_calc = lambda x: 5 if x > 0.6 else 4 if x > 0.4 else 3 if x > 0.25 else 2 if x > 0.16 else 1
+        writer = pd.ExcelWriter(f"{now()}_{output_name}")
         for column in corr.columns:
-            print(column)
             rank = pd.DataFrame(index=corr.index)
-            rank["corr_rank"] = corr[column].abs().apply(lambda x: 5 if x > 0.6 else 4 if x > 0.4 else 3 if x > 0.25 else 2 if x > 0.16 else 1)
+            rank["corr_rank"] = corr[column].abs().apply(rank_calc)
             rank["corr"] = corr[column]
-            rank["mic_rank"] = mic[column].apply(lambda x: 5 if x > 0.6 else 4 if x > 0.4 else 3 if x > 0.25 else 2 if x > 0.16 else 1)
+            rank["mic_rank"] = mic[column].apply(rank_calc)
             rank["mic"] = mic[column]
-            rank["rf_rank"] = rank_importance(rf, column).astype("int")
+            rank["rf_rank"] = self.__rank_importance(rf, column).astype("int")
             rank["rf"] = rf[column]
-            rank["etr_rank"] = rank_importance(etr, column).astype("int")
+            rank["etr_rank"] = self.__rank_importance(etr, column).astype("int")
             rank["etr"] = rf[column]
             rank_index = [column for column in corr.index]
+            print(rank)
             rank = rank.loc[rank_index][["corr", "mic", "rf", "etr"]].abs()
             mm = preprocessing.MinMaxScaler()
+            print(rank)
             rank = pd.DataFrame(mm.fit_transform(rank), index=rank.index, columns=rank.columns)
-            rank["score"] = rank.apply(lambda x: x["corr"]+x["mic"]+x["rf"]+x["etr"], axis=1)
+            print(rank)
+            rank["score"] = rank.sum(axis=1)
             rank["score"] = rank["score"].rank(ascending=False)
             rank.to_excel(writer, sheet_name=column)
             writer.save()
+        self._rank = rank

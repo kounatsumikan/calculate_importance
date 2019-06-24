@@ -5,11 +5,12 @@ from sklearn.ensemble import ExtraTreesRegressor
 from sklearn import preprocessing
 import numpy as np
 import datetime
+from utils.utils import now
 
 
 class calculate_importance():
-    
-    def __init__(self, variables, purpose):
+
+    def __init__(self, variables, purpose, ):
         '''
         目的変数に対する重要度や相関係数を算出するクラス
 
@@ -133,23 +134,27 @@ class calculate_importance():
         mic = self._all_mic
         rf = self._all_rf_importance
         etr = self._all_etr_importance
-        writer = pd.ExcelWriter(f"{datetime.datetime.today().strftime('%Y%m%d%H')}_{output_name}")
+        rank_calc = lambda x: 5 if x > 0.6 else 4 if x > 0.4 else 3 if x > 0.25 else 2 if x > 0.16 else 1
+        writer = pd.ExcelWriter(f"{now()}_{output_name}")
         for column in corr.columns:
-            print(column)
             rank = pd.DataFrame(index=corr.index)
-            rank["corr_rank"] = corr[column].abs().apply(lambda x: 5 if x > 0.6 else 4 if x > 0.4 else 3 if x > 0.25 else 2 if x > 0.16 else 1)
+            rank["corr_rank"] = corr[column].abs().apply(rank_calc)
             rank["corr"] = corr[column]
-            rank["mic_rank"] = mic[column].apply(lambda x: 5 if x > 0.6 else 4 if x > 0.4 else 3 if x > 0.25 else 2 if x > 0.16 else 1)
+            rank["mic_rank"] = mic[column].apply(rank_calc)
             rank["mic"] = mic[column]
             rank["rf_rank"] = self.__rank_importance(rf, column).astype("int")
             rank["rf"] = rf[column]
             rank["etr_rank"] = self.__rank_importance(etr, column).astype("int")
             rank["etr"] = rf[column]
             rank_index = [column for column in corr.index]
+            print(rank)
             rank = rank.loc[rank_index][["corr", "mic", "rf", "etr"]].abs()
             mm = preprocessing.MinMaxScaler()
+            print(rank)
             rank = pd.DataFrame(mm.fit_transform(rank), index=rank.index, columns=rank.columns)
-            rank["score"] = rank.apply(lambda x: x["corr"]+x["mic"]+x["rf"]+x["etr"], axis=1)
+            print(rank)
+            rank["score"] = rank.sum(axis=1)
             rank["score"] = rank["score"].rank(ascending=False)
             rank.to_excel(writer, sheet_name=column)
             writer.save()
+        self._rank = rank
