@@ -125,27 +125,27 @@ class calculate_importance():
         Args:
             output_name (String): 保存するエクセルのファイル名
         '''
-            corr = self.all_corr
-            mic = self.all_mic
-            rf = self.all_rf_importance
-            etr = self.all_etr_importance
-            writer = pd.ExcelWriter(f"../output/{datetime.datetime.today().strftime('%Y%m%d%H')}_{output_name}")
-            for column in corr.columns:
-                print(column)
-                rank = pd.DataFrame(index=corr.index)
-                rank["corr_rank"] = corr[column].abs().apply(lambda x: 5 if x > 0.6 else 4 if x > 0.4 else 3 if x > 0.25 else 2 if x > 0.16 else 1)
-                rank["corr"] = corr[column]
-                rank["mic_rank"] = mic[column].apply(lambda x: 5 if x > 0.6 else 4 if x > 0.4 else 3 if x > 0.25 else 2 if x > 0.16 else 1)
-                rank["mic"] = mic[column]
-                rank["rf_rank"] = rank_importance(rf, column).astype("int")
-                rank["rf"] = rf[column]
-                rank["etr_rank"] = rank_importance(etr, column).astype("int")
-                rank["etr"] = rf[column]
-                rank_index = [column for column in corr.index]
-                rank = rank.loc[rank_index][["corr", "mic", "rf", "etr"]].abs()
-                mm = preprocessing.MinMaxScaler()
-                rank = pd.DataFrame(mm.fit_transform(rank), index=rank.index, columns=rank.columns)
-                rank["score"] = rank.apply(lambda x: x["corr"]+x["mic"]+x["rf"]+x["etr"], axis=1)
-                rank["score"] = rank["score"].rank(ascending=False)
-                rank.to_excel(writer, sheet_name=column)
-                writer.save()
+        corr = self.all_corr
+        mic = self.all_mic
+        rf = self.all_rf_importance
+        etr = self.all_etr_importance
+        writer = pd.ExcelWriter(f"../output/{datetime.datetime.today().strftime('%Y%m%d%H')}_{output_name}")
+        for column in corr.columns:
+            print(column)
+            rank = pd.DataFrame(index=corr.index)
+            rank["corr_rank"] = corr[column].abs().apply(lambda x: 5 if x > 0.6 else 4 if x > 0.4 else 3 if x > 0.25 else 2 if x > 0.16 else 1)
+            rank["corr"] = corr[column]
+            rank["mic_rank"] = mic[column].apply(lambda x: 5 if x > 0.6 else 4 if x > 0.4 else 3 if x > 0.25 else 2 if x > 0.16 else 1)
+            rank["mic"] = mic[column]
+            rank["rf_rank"] = rank_importance(rf, column).astype("int")
+            rank["rf"] = rf[column]
+            rank["etr_rank"] = rank_importance(etr, column).astype("int")
+            rank["etr"] = rf[column]
+            rank_index = [column for column in corr.index]
+            rank = rank.loc[rank_index][["corr", "mic", "rf", "etr"]].abs()
+            mm = preprocessing.MinMaxScaler()
+            rank = pd.DataFrame(mm.fit_transform(rank), index=rank.index, columns=rank.columns)
+            rank["score"] = rank.apply(lambda x: x["corr"]+x["mic"]+x["rf"]+x["etr"], axis=1)
+            rank["score"] = rank["score"].rank(ascending=False)
+            rank.to_excel(writer, sheet_name=column)
+            writer.save()
