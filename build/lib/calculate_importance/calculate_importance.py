@@ -10,7 +10,7 @@ from utils.utils import now
 
 class calculate_importance():
 
-    def __init__(self, variables, purpose, ):
+    def __init__(self, variables, purpose, para=["rf", "etr", "corr", "mic"]):
         '''
         目的変数に対する重要度や相関係数を算出するクラス
 
@@ -31,24 +31,27 @@ class calculate_importance():
 
         for column in y.columns:
             print(column)
-            rf_importance = self.__calculate_rf_importance(X, y[column])
-            print(" rf")
-            etr_importance = self.__calculate_etr_importance(X, y[column])
-            print(" etr")
-            mic_list = self.__mic_calculation(X, y[column])
-            print(" mic")
-            corr_list = self.__corr_calculation(X, y[column])
-            print(" corr")
+            if "rf" in para:
+                rf_importance = self.__calculate_rf_importance(X, y[column])
+                rf_importance = pd.Series(rf_importance, index=feature_x, name=column)
+                self._all_rf_importance = pd.concat([self._all_rf_importance, rf_importance], axis=1, sort=False)
+                print(" rf")
+            if "etr" in para:
+                etr_importance = self.__calculate_etr_importance(X, y[column])
+                etr_importance = pd.Series(etr_importance, index=feature_x, name=column)
+                self._all_etr_importance = pd.concat([self._all_etr_importance, etr_importance], axis=1, sort=False)
+                print(" etr")
+            if "mic" in para:
+                mic_list = self.__mic_calculation(X, y[column])
+                mic = pd.Series(mic_list, index=feature_x, name=column)
+                self._all_mic = pd.concat([self._all_mic, mic], axis=1, sort=False)
+                print(" mic")
+            if "corr" in para:
+                corr_list = self.__corr_calculation(X, y[column])
+                corr = pd.Series(corr_list, index=feature_x, name=column)
+                self._all_corr = pd.concat([self._all_corr, corr], axis=1, sort=False)
+                print(" corr")
 
-            rf_importance = pd.Series(rf_importance, index=feature_x, name=column)
-            etr_importance = pd.Series(etr_importance, index=feature_x, name=column)
-            mic = pd.Series(mic_list, index=feature_x, name=column)
-            corr = pd.Series(corr_list, index=feature_x, name=column)
-
-            self._all_corr = pd.concat([self._all_corr, corr], axis=1, sort=False)
-            self._all_mic = pd.concat([self._all_mic, mic], axis=1, sort=False)
-            self._all_rf_importance = pd.concat([self._all_rf_importance, rf_importance], axis=1, sort=False)
-            self._all_etr_importance = pd.concat([self._all_etr_importance, etr_importance], axis=1, sort=False)
         self._all_corr = self._all_corr.fillna(0)
 
 
